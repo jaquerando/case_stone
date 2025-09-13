@@ -1,0 +1,533 @@
+# Orquestra Medallion (Dataproc Serverless) -> Postgres
+# 3 modos de ingestão: function | sts | vm
+
+main:
+  params: [cfg]
+
+  steps:
+    # ---------- run_id ----------
+    - set_run_from_cfg:
+        try:
+          assign:
+            - my_run: ${cfg.run_id}
+        except:
+          as: e
+          assign:
+            - my_run: "exec-fallback"
+
+    # ---------- project ----------
+    - set_project_from_cfg:
+        try:
+          assign:
+            - my_project: ${cfg.project_id}
+        except:
+          as: e
+          assign:
+            - my_project: "case-stone-471402"
+
+    # ---------- region ----------
+    - set_region_from_cfg:
+        try:
+          assign:
+            - my_region: ${cfg.region}
+        except:
+          as: e
+          assign:
+            - my_region: "us-central1"
+
+    # ---------- base_url ----------
+    - build_base_url:
+        assign:
+          - base_url: '${"https://dataproc.googleapis.com/v1/projects/" + my_project + "/locations/" + my_region}'
+
+    # ---------- bucket ----------
+    - set_bucket_from_cfg:
+        try:
+          assign:
+            - my_bucket: ${cfg.bucket}
+        except:
+          as: e
+          assign:
+            - my_bucket: "case-stone-medallion-471402"
+
+    # ---------- code paths ----------
+    - set_bronze_from_cfg:
+        try:
+          assign:
+            - my_bronze_py: ${cfg.bronze_py}
+        except:
+          as: e
+          assign:
+            - my_bronze_py: '${"gs://" + my_bucket + "/code/bronze.py"}'
+
+    - set_silver_from_cfg:
+        try:
+          assign:
+            - my_silver_py: ${cfg.silver_py}
+        except:
+          as: e
+          assign:
+            - my_silver_py: '${"gs://" + my_bucket + "/code/silver.py"}'
+
+    - set_gold_from_cfg:
+        try:
+          assign:
+            - my_gold_py: ${cfg.gold_py}
+        except:
+          as: e
+          assign:
+            - my_gold_py: '${"gs://" + my_bucket + "/code/gold.py"}'
+
+    - set_load_from_cfg:
+        try:
+          assign:
+            - my_load_py: ${cfg.load_py}
+        except:
+          as: e
+          assign:
+            - my_load_py: '${"gs://" + my_bucket + "/code/load_postgres.py"}'
+
+    # ---------- URLs da RFB ----------
+    - set_empresas_url_from_cfg:
+        try:
+          assign:
+            - my_empresas_url: ${cfg.url_empresas}
+        except:
+          as: e
+          assign:
+            - my_empresas_url: "https://dadosabertos.rfb.gov.br/CNPJ/Empresas0.zip"
+
+    - set_socios_url_from_cfg:
+        try:
+          assign:
+            - my_socios_url: ${cfg.url_socios}
+        except:
+          as: e
+          assign:
+            - my_socios_url: "https://dadosabertos.rfb.gov.br/CNPJ/Socios0.zip"
+
+    # ---------- JARs e DB ----------
+    - set_jar_cloudsql_from_cfg:
+        try:
+          assign:
+            - my_jar_cloudsql: ${cfg.jar_cloudsql}
+        except:
+          as: e
+          assign:
+            - my_jar_cloudsql: '${"gs://" + my_bucket + "/jars/cloud-sql-postgres-1.17.0.jar"}'
+
+    - set_jar_postgres_from_cfg:
+        try:
+          assign:
+            - my_jar_postgres: ${cfg.jar_postgres}
+        except:
+          as: e
+          assign:
+            - my_jar_postgres: '${"gs://" + my_bucket + "/jars/postgresql-42.7.4.jar"}'
+
+    - set_instance_conn_from_cfg:
+        try:
+          assign:
+            - my_instance_conn: ${cfg.instance_conn_name}
+        except:
+          as: e
+          assign:
+            - my_instance_conn: "case-stone-471402:us-central1:stone-pg"
+
+    - set_db_name_from_cfg:
+        try:
+          assign:
+            - my_db_name: ${cfg.db_name}
+        except:
+          as: e
+          assign:
+            - my_db_name: "stone"
+
+    - set_db_user_from_cfg:
+        try:
+          assign:
+            - my_db_user: ${cfg.db_user}
+        except:
+          as: e
+          assign:
+            - my_db_user: "stone"
+
+    - set_db_pass_from_cfg:
+        try:
+          assign:
+            - my_db_pass: ${cfg.db_pass}
+        except:
+          as: e
+          assign:
+            - my_db_pass: "stone123!"
+
+    # ---------- markers ----------
+    - set_markers:
+        assign:
+          - ingest_marker: '${"markers/" + my_run + "/ingest.SUCCESS"}'
+          - bronze_marker: '${"markers/" + my_run + "/bronze.SUCCESS"}'
+          - silver_marker: '${"markers/" + my_run + "/silver.SUCCESS"}'
+          - gold_marker:   '${"markers/" + my_run + "/gold.SUCCESS"}'
+          - load_marker:   '${"markers/" + my_run + "/load.SUCCESS"}'
+
+    # ---------- ingest configs ----------
+    - set_ingest_mode_from_cfg:
+        try:
+          assign:
+            - my_ingest: ${cfg.ingest_mode}
+        except:
+          as: e
+          assign:
+            - my_ingest: "function"
+
+    - set_function_url_from_cfg:
+        try:
+          assign:
+            - my_function_url: ${cfg.function_url}
+        except:
+          as: e
+          assign:
+            - my_function_url: "https://ingest-rfb-vyavg2724a-uc.a.run.app"
+
+    - set_ingest_urls_from_cfg:
+        try:
+          assign:
+            - my_ingest_urls: ${cfg.ingest_urls}
+        except:
+          as: e
+          assign:
+            - my_ingest_urls:
+                - '${my_empresas_url}'
+                - '${my_socios_url}'
+
+    - set_sts_from_cfg:
+        try:
+          assign:
+            - my_sts_job_name: ${cfg.sts_job_name}
+        except:
+          as: e
+          assign:
+            - my_sts_job_name: null
+
+    # ---------- VM (split em dois steps, sem duplicidade) ----------
+    - set_vm_zone_from_cfg:
+        try:
+          assign:
+            - my_vm_zone: ${cfg.vm_zone}
+        except:
+          as: e
+          assign:
+            - my_vm_zone: null
+
+    - set_vm_name_from_cfg:
+        try:
+          assign:
+            - my_vm_name: ${cfg.vm_name}
+        except:
+          as: e
+          assign:
+            - my_vm_name: null
+
+    # ---------- router ----------
+    - ingest_router:
+        switch:
+          - condition: '${my_ingest == "function"}'
+            next: ingest_function_call
+          - condition: '${my_ingest == "sts"}'
+            next: ingest_sts_run
+          - condition: '${my_ingest == "vm"}'
+            next: ingest_vm_start
+        next: ingest_function_call
+
+    # ============ INGEST: Cloud Function ============
+    - ingest_function_call:
+        call: http.post
+        args:
+          url: '${my_function_url}'
+          headers: { "Content-Type": "application/json" }
+          body:
+            bucket: '${my_bucket}'
+            prefix: '${"raw/" + my_run + "/"}'
+            run_id: '${my_run}'
+            urls: ${my_ingest_urls}
+            marker: '${ingest_marker}'
+        result: ingestResp
+        next: ingest_wait_marker
+
+    - ingest_wait_marker:
+        try:
+          steps:
+            - get_marker:
+                call: googleapis.storage.v1.objects.get
+                args:
+                  bucket: '${my_bucket}'
+                  object: '${ingest_marker}'
+                next: bronze_create
+        except:
+          as: e
+          steps:
+            - sleep_ingest_marker:
+                call: sys.sleep
+                args: { seconds: 10 }
+                next: ingest_wait_marker
+
+    # ============ INGEST: STS ============
+    - ingest_sts_run:
+        call: googleapis.storagetransfer.v1.transferJobs.run
+        args:
+          jobName: '${my_sts_job_name}'
+          body:
+            projectId: '${my_project}'
+        result: stsRun
+        next: ingest_wait_raw_objects
+
+    - ingest_wait_raw_objects:
+        try:
+          steps:
+            - list_raw:
+                call: googleapis.storage.v1.objects.list
+                args:
+                  bucket: '${my_bucket}'
+                  prefix: '${"raw/" + my_run + "/"}'
+                result: rawList
+            - raw_gate:
+                switch:
+                  - condition: '${rawList.items != null and len(rawList.items) > 0}'
+                    next: bronze_create
+            - sleep_again_sts:
+                call: sys.sleep
+                args: { seconds: 10 }
+                next: ingest_wait_raw_objects
+        except:
+          as: e
+          steps:
+            - sleep_on_error_sts:
+                call: sys.sleep
+                args: { seconds: 10 }
+                next: ingest_wait_raw_objects
+
+    # ============ INGEST: VM ============
+    - ingest_vm_start:
+        call: googleapis.compute.v1.instances.start
+        args:
+          project: '${my_project}'
+          zone: '${my_vm_zone}'
+          instance: '${my_vm_name}'
+        result: vmStart
+        next: ingest_wait_marker
+
+    # ============ BRONZE ============
+    - bronze_create:
+        call: http.post
+        args:
+          url: '${base_url + "/batches"}'
+          auth: { type: OAuth2 }
+          body:
+            labels: { step: "bronze", run_id: '${my_run}' }
+            runtimeConfig:
+              version: "2.1"
+              properties:
+                spark.driver.cores: "4"
+                spark.executor.cores: "4"
+                spark.executor.instances: "2"
+                spark.driverEnv.RUN_ID: '${my_run}'
+                spark.driverEnv.BUCKET: '${my_bucket}'
+                spark.driverEnv.URL_EMPRESAS: '${my_empresas_url}'
+                spark.driverEnv.URL_SOCIOS: '${my_socios_url}'
+            pysparkBatch:
+              mainPythonFileUri: '${my_bronze_py}'
+        result: bronzeResp
+        next: bronze_poll
+
+    - bronze_poll:
+        call: http.get
+        args:
+          url: '${"https://dataproc.googleapis.com/v1/" + bronzeResp.body.name}'
+          auth: { type: OAuth2 }
+        result: bronzeStatus
+        next: bronze_state
+
+    - bronze_state:
+        switch:
+          - condition: '${bronzeStatus.body.state == "SUCCEEDED"}'
+            next: bronze_mark
+          - condition: '${bronzeStatus.body.state == "FAILED" or bronzeStatus.body.state == "CANCELLED"}'
+            raise: "BRONZE_FAILED"
+        next: bronze_sleep
+
+    - bronze_sleep:
+        call: sys.sleep
+        args: { seconds: 10 }
+        next: bronze_poll
+
+    - bronze_mark:
+        call: googleapis.storage.v1.objects.insert
+        args:
+          bucket: '${my_bucket}'
+          name:   '${bronze_marker}'
+          uploadType: media
+        result: bmark
+        next: silver_create
+
+    # ============ SILVER ============
+    - silver_create:
+        call: http.post
+        args:
+          url: '${base_url + "/batches"}'
+          auth: { type: OAuth2 }
+          body:
+            labels: { step: "silver", run_id: '${my_run}' }
+            runtimeConfig:
+              version: "2.1"
+              properties:
+                spark.driver.cores: "4"
+                spark.executor.cores: "4"
+                spark.executor.instances: "2"
+                spark.driverEnv.RUN_ID: '${my_run}'
+                spark.driverEnv.BUCKET: '${my_bucket}'
+            pysparkBatch:
+              mainPythonFileUri: '${my_silver_py}'
+        result: silverResp
+        next: silver_poll
+
+    - silver_poll:
+        call: http.get
+        args:
+          url: '${"https://dataproc.googleapis.com/v1/" + silverResp.body.name}'
+          auth: { type: OAuth2 }
+        result: silverStatus
+        next: silver_state
+
+    - silver_state:
+        switch:
+          - condition: '${silverStatus.body.state == "SUCCEEDED"}'
+            next: silver_mark
+          - condition: '${silverStatus.body.state == "FAILED" or silverStatus.body.state == "CANCELLED"}'
+            raise: "SILVER_FAILED"
+        next: silver_sleep
+
+    - silver_sleep:
+        call: sys.sleep
+        args: { seconds: 10 }
+        next: silver_poll
+
+    - silver_mark:
+        call: googleapis.storage.v1.objects.insert
+        args:
+          bucket: '${my_bucket}'
+          name:   '${silver_marker}'
+          uploadType: media
+        result: smark
+        next: gold_create
+
+    # ============ GOLD ============
+    - gold_create:
+        call: http.post
+        args:
+          url: '${base_url + "/batches"}'
+          auth: { type: OAuth2 }
+          body:
+            labels: { step: "gold", run_id: '${my_run}' }
+            runtimeConfig:
+              version: "2.1"
+              properties:
+                spark.driver.cores: "4"
+                spark.executor.cores: "4"
+                spark.executor.instances: "2"
+                spark.driverEnv.RUN_ID: '${my_run}'
+                spark.driverEnv.BUCKET: '${my_bucket}'
+            pysparkBatch:
+              mainPythonFileUri: '${my_gold_py}'
+        result: goldResp
+        next: gold_poll
+
+    - gold_poll:
+        call: http.get
+        args:
+          url: '${"https://dataproc.googleapis.com/v1/" + goldResp.body.name}'
+          auth: { type: OAuth2 }
+        result: goldStatus
+        next: gold_state
+
+    - gold_state:
+        switch:
+          - condition: '${goldStatus.body.state == "SUCCEEDED"}'
+            next: gold_mark
+          - condition: '${goldStatus.body.state == "FAILED" or goldStatus.body.state == "CANCELLED"}'
+            raise: "GOLD_FAILED"
+        next: gold_sleep
+
+    - gold_sleep:
+        call: sys.sleep
+        args: { seconds: 10 }
+        next: gold_poll
+
+    - gold_mark:
+        call: googleapis.storage.v1.objects.insert
+        args:
+          bucket: '${my_bucket}'
+          name:   '${gold_marker}'
+          uploadType: media
+        result: gmark
+        next: load_create
+
+    # ============ LOAD -> Postgres ============
+    - load_create:
+        call: http.post
+        args:
+          url: '${base_url + "/batches"}'
+          auth: { type: OAuth2 }
+          body:
+            labels: { step: "load", run_id: '${my_run}' }
+            runtimeConfig:
+              version: "2.1"
+              properties:
+                spark.driver.cores: "4"
+                spark.executor.cores: "4"
+                spark.executor.instances: "2"
+                spark.driverEnv.RUN_ID: '${my_run}'
+                spark.driverEnv.BUCKET: '${my_bucket}'
+                spark.driverEnv.INSTANCE_CONN_NAME: '${my_instance_conn}'
+                spark.driverEnv.DB_NAME: '${my_db_name}'
+                spark.driverEnv.DB_USER: '${my_db_user}'
+                spark.driverEnv.DB_PASS: '${my_db_pass}'
+            pysparkBatch:
+              mainPythonFileUri: '${my_load_py}'
+              jarFileUris:
+                - '${my_jar_cloudsql}'
+                - '${my_jar_postgres}'
+        result: loadResp
+        next: load_poll
+
+    - load_poll:
+        call: http.get
+        args:
+          url: '${"https://dataproc.googleapis.com/v1/" + loadResp.body.name}'
+          auth: { type: OAuth2 }
+        result: loadStatus
+        next: load_state
+
+    - load_state:
+        switch:
+          - condition: '${loadStatus.body.state == "SUCCEEDED"}'
+            next: load_mark
+          - condition: '${loadStatus.body.state == "FAILED" or loadStatus.body.state == "CANCELLED"}'
+            raise: "LOAD_FAILED"
+        next: load_sleep
+
+    - load_sleep:
+        call: sys.sleep
+        args: { seconds: 10 }
+        next: load_poll
+
+    - load_mark:
+        call: googleapis.storage.v1.objects.insert
+        args:
+          bucket: '${my_bucket}'
+          name:   '${load_marker}'
+          uploadType: media
+        result: lmark
+        next: done
+
+    - done:
+        return: '${"OK " + my_run}'
