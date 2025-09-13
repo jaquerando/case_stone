@@ -59,23 +59,23 @@ Eu construí gates por markers no GCS e polling do estado dos batches Dataproc. 
 
 ### Camadas medalhão
 
-Bronze: descompacto os zips da RFB direto no GCS, preservando o bruto por tipo (empresas/, socios/).
+- **Bronze**: descompacto os zips da RFB direto no GCS, preservando o bruto por tipo (empresas/, socios/).
 
-Silver: schema, limpeza e tipos (ex.: normalizo capital_social, tipos inteiros, encoding latin1 → parquet particionado por run_id).
+- **Silver**: schema, limpeza e tipos (ex.: normalizo capital_social, tipos inteiros, encoding latin1 → parquet particionado por run_id).
 
-Gold: regras de negócio enxutas (ex.: qtde_socios, flag_socio_estrangeiro, doc_alvo para porte e critérios). Resultado final em parquet (e depois load para Postgres).
+- **Gold**: regras de negócio enxutas (ex.: qtde_socios, flag_socio_estrangeiro, doc_alvo para porte e critérios). Resultado final em parquet (e depois load para Postgres).
 
 
 ### Ingestão desacoplada (3 modos)
 
-(A) Cloud Run (HTTP container)
+- (A) Cloud Run (HTTP container)
 Recebe bucket, prefixo raw/run_id, urls (RFB) e baixa cada zip direto no GCS. Quando terminar, escreve ingest.SUCCESS.
 HTTP 504 na UI? Proxy pode estourar timeout, mas o job continua; o marker é a verdade, e o Workflows não depende do 200 para progredir — ele observa o marker.
 
-(B) Storage Transfer Service (STS)
+- (B) Storage Transfer Service (STS)
 Defini um job de transferência HTTP→GCS e o Workflows poll a pasta raw/<run_id>/. Achando o arquivo, prossegue.
 
-(C) VM (marker)
+- (C) VM (marker)
 Plano C: se eu precisar rodar scripts legados numa VM, o Workflows liga a VM, espera o marker e segue. Útil pra migrações.
 
 
