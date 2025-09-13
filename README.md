@@ -53,7 +53,7 @@ Como eu entendi que "aplicações transacionais plugarem" significaria que neces
 Eu cogitei em usar o Airflow, separando uma dag para ingestao, com diferentes tasks nos 3 modos possíveis, e outras dags para bronze, silver e gold, separadamente. Mas manter um Composer é caro, e acredito que seria justificado se tivessem mais etapas e interdependências.
 Eu construí gates por markers no GCS e polling do estado dos batches Dataproc. Isso me deu idempotência por run_id e reexecução segura.
 
-- Containerização: a camada de ingestão HTTP foi empacotada (Flask + requests) e publicada em Cloud Run (container) — é “o mínimo necessário” pra cumprir o requisito de container e manter dev-prod alinhado. O Spark em si já roda “serverless” no Dataproc, não faria sentido colocar em um container.
+- Containerização: a camada de ingestão HTTP foi empacotada (Flask + requests) e publicada em Cloud Run (container). O Spark em si já roda “serverless” no Dataproc, não faria sentido colocar em um container.
 
 - Observabilidade/operacional: os markers deixam claro o ponto de falha. O que deu erro? Em que step? O que deu certo? Tudo é parametrizável via run_id e JSON de execução do Workflows. Ficou mais fácil reexecutar só o que falta. O que já deu certo, não é reexecutado.
 
