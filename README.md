@@ -49,12 +49,13 @@ Como eu entendi que "aplicações transacionais plugarem" significaria que neces
 
 Spark (Dataproc Serverless): eu gosto bastante de usar Spark e o volume dos dados da RFB pede (COM CERTEZA PEDE) processamento distribuído. Usei Serverless pra não gerenciar cluster.
 
-Workflows: simples, barato e state machine clara e também eu não havia usado esse serviço antes e queria usar uma ferramenta inédita pois ao menos terei aprendido, pelo menos o básico, desse serviço. O que de fato ocorreu, pois passei mais de 60 horas para fazer esse desafio e boa parte desse tempo, em torno de 80 %, foi no workflows.
+Workflows: simples, barato, sem cluster e state machine clara, e também eu não havia usado esse serviço antes e queria usar uma ferramenta inédita pois ao menos terei aprendido, pelo menos o básico, desse serviço. O que de fato ocorreu, pois passei mais de 60 horas para fazer esse desafio e boa parte desse tempo, em torno de 80 %, foi no workflows. 
+Eu cogitei em usar o Airflow, separando uma dag para ingestao, com diferentes tasks nos 3 modos possíveis, e outras dags para bronze, silver e gold, separadamente. Mas manter um Composer é caro, e acredito que seria justificado se tivessem mais etapas e interdependências.
 Eu construí gates por markers no GCS e polling do estado dos batches Dataproc. Isso me deu idempotência por run_id e reexecução segura.
 
 Containerização: a camada de ingestão HTTP foi empacotada (Flask + requests) e publicada em Cloud Run (container) — é “o mínimo necessário” pra cumprir o requisito de container e manter dev-prod alinhado. O Spark em si já roda “serverless” no Dataproc, não faria sentido colocar em um container.
 
-Observabilidade/operacional: os markers deixam claro o ponto de falha. O que deu erro? Em que step? O que deu certo? Tudo é parametrizável via run_id e JSON de execução do Workflows. Ficou mais fácil reexecutar só o que falta. O que já deu certo, não é reexecutado
+Observabilidade/operacional: os markers deixam claro o ponto de falha. O que deu erro? Em que step? O que deu certo? Tudo é parametrizável via run_id e JSON de execução do Workflows. Ficou mais fácil reexecutar só o que falta. O que já deu certo, não é reexecutado.
 
 ### Camadas medalhão
 
@@ -87,8 +88,16 @@ gcloud workflows execute medallion-spark \
   --data="$(< ~/infra/exec.json)"
 ```
 
-  Executo com um payload único 
+  Executo com um payload único.
+
   Eu padronizei um exec.json no repo, mas nao o coloquei aqui porque tem muitas informações sensíveis, desde usuário, senha do db, urls entre muitas outras informações.
+
+Visão da UI:
+
+<img width="527" height="730" alt="image" src="https://github.com/user-attachments/assets/8f6cad4e-3948-41f3-af77-8e20c1de9890" />
+
+
+### Estrutura do repositório
 
 ```bash
   case_stone/
@@ -107,4 +116,15 @@ gcloud workflows execute medallion-spark \
    ├─ requirements.txt
    └─ main.py
 ```
+
+### Custos e limites
+
+- Serverless (Dataproc/Workflows/Run) me ajuda a pagar só quando executa.
+
+- Se o volume crescer, autoscaling de executors no Spark e partitioning no silver/gold já estão configurados.
+
+- Para catálogo, dá pra plugar BigLake/Dataplex. Para linage, OpenLineage + Marquez (ou Data Catalog).
+
+- Se algum dia essa ingestão precisar de SLA forte, eu colocaria Pub/Sub + Cloud Run jobs com retry/backoff.
+
 
