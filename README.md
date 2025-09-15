@@ -36,6 +36,8 @@ O **Workflows** orquestra: escolhe o modo de ingestão, aguarda *markers/arquivo
 
 [Cloud SQL (Postgres)]
      └─ Tabela final por CNPJ (chave primária), pronta p/ apps transacionais
+
+
 ```
 flowchart LR
 
@@ -46,18 +48,18 @@ flowchart LR
 
   %% === INGEST ===
   subgraph ING["Ingestao desacoplada"]
-    A["Cloud Run (HTTP, container)"]
+    A["Cloud Run &#40;HTTP, container&#41;"]
     B["Storage Transfer Service"]
-    C["VM (marker via serial -> GCS)"]
+    C["VM &#40;marker via serial -> GCS&#41;"]
   end
 
   %% === STORAGE ===
-  subgraph GCS["Google Cloud Storage (Data Lake)"]
+  subgraph GCS["Google Cloud Storage &#40;Data Lake&#41;"]
     raw["raw/<run_id>/*.zip"]
-    brz["bronze/<run_id>/(empresas,socios)/*.csv"]
-    slv["silver/<run_id>/(empresas,socios)/*.parquet"]
+    brz["bronze/<run_id>/&#40;empresas,socios&#41;/*.csv"]
+    slv["silver/<run_id>/&#40;empresas,socios&#41;/*.parquet"]
     gld["gold/<run_id>/resultado_final/*.parquet"]
-    mrk["markers/<run_id>/(ingest,bronze,silver,gold,load).SUCCESS"]
+    mrk["markers/<run_id>/&#40;ingest,bronze,silver,gold,load&#41;.SUCCESS"]
   end
 
   %% === WORKFLOWS ===
@@ -66,7 +68,7 @@ flowchart LR
   end
 
   %% === SPARK ===
-  subgraph DP["Dataproc Serverless (Spark)"]
+  subgraph DP["Dataproc Serverless &#40;Spark&#41;"]
     p1["bronze.py  -> unzip para GCS"]
     p2["silver.py  -> schemas/normalizacoes -> Parquet"]
     p3["gold.py    -> agregacoes/flags"]
@@ -74,8 +76,8 @@ flowchart LR
   end
 
   %% === DB ===
-  subgraph SQL["Cloud SQL (Postgres)"]
-    tbl["Tabela final por CNPJ (PK: cnpj)"]
+  subgraph SQL["Cloud SQL &#40;Postgres&#41;"]
+    tbl["Tabela final por CNPJ &#40;PK: cnpj&#41;"]
   end
 
   %% === FLOWS ===
@@ -91,7 +93,6 @@ flowchart LR
   wf1 --> p2 --> slv --> mrk
   wf1 --> p3 --> gld --> mrk
   wf1 --> p4 --> tbl --> mrk
-
 ```mermaid
 flowchart LR
   %% ======== NODES ========
