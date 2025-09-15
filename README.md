@@ -71,7 +71,7 @@ flowchart LR
 
   %% === WORKFLOWS ===
   subgraph WF["**Google Cloud Workflows**"]
-    wf1["Orquestracao: <br/>gates por marker ou raw"]
+    wf1["**Orquestracao**: <br/>gates por marker ou raw"]
   end
 
   %% === SPARK ===
