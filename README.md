@@ -26,7 +26,7 @@ flowchart LR
   end
 
   %% === STORAGE ===
-  subgraph GCS["**Google Cloud Storage (Data Lake)**"]
+  subgraph GCS["**Google Cloud Storage <br/>(Data Lake)**"]
     raw["**raw**/<run_id>/*.zip"]
     brz["**bronze**/<run_id>/<br/>(empresas,socios)/*.csv"]
     slv["**silver**/<run_id>/<br/>(empresas,socios)/*.parquet"]
@@ -40,7 +40,7 @@ flowchart LR
   end
 
   %% === SPARK ===
-  subgraph DP["**Dataproc Serverless (Spark)**"]
+  subgraph DP["**Dataproc Serverless <br/>(Spark)**"]
     p1["**bronze**.py <br/>(unzip a partir de raw)"]
     p2["**silver**.py <br/>(schemas/normalizacoes -> <br/>Parquet)"]
     p3["**gold**.py <br/>(agregacoes/flags)"]
