@@ -83,7 +83,7 @@ flowchart LR
   end
 
   %% === DB ===
-  subgraph SQL["Cloud SQL ; Postgres ;"]
+  subgraph SQL["Cloud SQL - Postgres "]
     tbl["Tabela final por CNPJ<br/>&#40;PK: cnpj&#41;"]
   end
 
