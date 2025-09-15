@@ -63,7 +63,7 @@ flowchart LR
   %% === STORAGE ===
   subgraph GCS["Cloud Storage e Data Lake"]
     raw["raw/<run_id>/*.zip"]
-    brz["bronze/<run_id>/<br/>;empresas,socios/*.csv"]
+    brz["bronze/<run_id>/<br/>empresas,socios/*.csv"]
     slv["silver/<run_id>/<br/>;empresas,socios/*.parquet"]
     gld["gold/<run_id>/<br/>;resultado_final/*.parquet"]
     mrk["markers/<run_id>/<br/>&#40;ingest,bronze,silver,gold,load;.SUCCESS"]
