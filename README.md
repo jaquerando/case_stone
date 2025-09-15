@@ -84,7 +84,7 @@ flowchart LR
 
   %% === DB ===
   subgraph SQL["**Cloud SQL (Postgres)**"]
-    tbl["**Tabela final** por CNPJ <br/>(PK: cnpj)"]
+    tbl["**Tabela final** por CNPJ <br/>(PK: cnpj) <br/>Pronta p/ apps transacionais"]
   end
 
   %% === FLUXOS DE DADOS ===
@@ -111,7 +111,7 @@ flowchart LR
 
 ### Decisões
 
-- Eu quis desacoplar ingestão do processamento. 
+- Eu quis desacoplar **ingestão** do processamento. 
 O Workflows só “espera um sinal” (marker/arquivos) e toca o Spark. Isso reduz acoplamento, deixa claro onde cada parte falha e me dá flexibilidade: se amanhã alguém quiser puxar o raw com outro método (SFTP, API, crawler…), o pipeline Spark continua igual. Também foi intencional tentar 3 caminhos de ingest (Cloud Run, STS, VM), por robustez — se um modo falhar, tenho outras alternativas já implantadas.
 
 - **Postgres** (Cloud SQL) na saída: o case pede um banco que permita aplicações transacionais plugarem. Postgres é padrão de mercado, tem chave primária/UPSERT, integra bem com apps e é fácil de versionar/limpar pra homologações.
