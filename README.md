@@ -40,7 +40,7 @@ flowchart LR
   end
 
   %% === SPARK ===
-  subgraph DP["**Dataproc Serverless <br/>(Spark)**"]
+  subgraph DP["**Dataproc Serverless**"]
     p1["**bronze**.py <br/>(unzip a partir de raw)"]
     p2["**silver**.py <br/>(schemas/normalizacoes -> <br/>Parquet)"]
     p3["**gold**.py <br/>(agregacoes/flags)"]
