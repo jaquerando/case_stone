@@ -36,54 +36,59 @@ O **Workflows** orquestra: escolhe o modo de ingestão, aguarda *markers/arquivo
 
 [Cloud SQL (Postgres)]
      └─ Tabela final por CNPJ (chave primária), pronta p/ apps transacionais
-
-
 ```
+
+
+
+
+
+
+
+
+```mermaid
 flowchart LR
 
   %% === SOURCES ===
   subgraph SRC["RFB Dados Abertos"]
-    s1["ZIPs publicos: EmpresasN.zip / SociosN.zip"]
+    s1["ZIPs publicos:<br/>EmpresasN.zip / SociosN.zip"]
   end
 
   %% === INGEST ===
-  subgraph ING["Ingestao desacoplada"]
-    A["Cloud Run &#40;HTTP, container&#41;"]
+  subgraph ING["Ingestão desacoplada"]
+    A["Cloud Run<br/>&#40;HTTP, container&#41;"]
     B["Storage Transfer Service"]
-    C["VM &#40;marker via serial -> GCS&#41;"]
+    C["VM<br/>&#40;marker via serial -> GCS&#41;"]
   end
 
   %% === STORAGE ===
-  subgraph GCS["Google Cloud Storage &#40;Data Lake&#41;"]
+  subgraph GCS["Google Cloud Storage<br/>&#40;Data Lake&#41;"]
     raw["raw/<run_id>/*.zip"]
-    brz["bronze/<run_id>/&#40;empresas,socios&#41;/*.csv"]
-    slv["silver/<run_id>/&#40;empresas,socios&#41;/*.parquet"]
-    gld["gold/<run_id>/resultado_final/*.parquet"]
-    mrk["markers/<run_id>/&#40;ingest,bronze,silver,gold,load&#41;.SUCCESS"]
+    brz["bronze/<run_id>/<br/>&#40;empresas,socios&#41;/*.csv"]
+    slv["silver/<run_id>/<br/>&#40;empresas,socios&#41;/*.parquet"]
+    gld["gold/<run_id>/<br/>resultado_final/*.parquet"]
+    mrk["markers/<run_id>/<br/>&#40;ingest,bronze,silver,gold,load&#41;.SUCCESS"]
   end
 
   %% === WORKFLOWS ===
   subgraph WF["Google Cloud Workflows"]
-    wf1["Orquestracao: gates por marker e polling de jobs"]
+    wf1["Orquestração:<br/>gates por marker e polling de jobs"]
   end
 
   %% === SPARK ===
-  subgraph DP["Dataproc Serverless &#40;Spark&#41;"]
-    p1["bronze.py  -> unzip para GCS"]
-    p2["silver.py  -> schemas/normalizacoes -> Parquet"]
-    p3["gold.py    -> agregacoes/flags"]
-    p4["load_postgres.py -> UPSERT em Postgres"]
+  subgraph DP["Dataproc Serverless<br/>&#40;Spark&#41;"]
+    p1["bronze.py<br/>unzip para GCS"]
+    p2["silver.py<br/>schemas/normalizações -> Parquet"]
+    p3["gold.py<br/>agregações/flags"]
+    p4["load_postgres.py<br/>UPSERT em Postgres"]
   end
 
   %% === DB ===
-  subgraph SQL["Cloud SQL &#40;Postgres&#41;"]
-    tbl["Tabela final por CNPJ &#40;PK: cnpj&#41;"]
+  subgraph SQL["Cloud SQL<br/>&#40;Postgres&#41;"]
+    tbl["Tabela final por CNPJ<br/>&#40;PK: cnpj&#41;"]
   end
 
   %% === FLOWS ===
-  s1 --> A
-  s1 --> B
-  s1 --> C
+  s1 --> A & B & C
 
   A --> raw
   B --> raw
@@ -93,95 +98,6 @@ flowchart LR
   wf1 --> p2 --> slv --> mrk
   wf1 --> p3 --> gld --> mrk
   wf1 --> p4 --> tbl --> mrk
-```mermaid
-flowchart LR
-  %% ======== NODES ========
-
-  subgraph SRC[ RFB Dados Abertos ]
-    S1[ZIPs públicos<br/>EmpresasN.zip / SociosN.zip]
-  end
-
-  subgraph ING[ Ingestão desacoplada ]
-    A[Cloud Run<br/>(HTTP, container)]
-    B[Storage Transfer Service]
-    C[VM<br/>(marker via serial → GCS)]
-  end
-
-  subgraph GCS[ Google Cloud Storage — Data Lake ]
-    RAW[raw/&lt;run_id&gt;/*.zip]
-    BRZ[bronze/&lt;run_id&gt;/{empresas,socios}/*.csv]
-    SLV[silver/&lt;run_id&gt;/{empresas,socios}/*.parquet]
-    GLD[gold/&lt;run_id&gt;/resultado_final/*.parquet]
-    MRK[markers/&lt;run_id&gt;/{ingest|bronze|silver|gold|load}.SUCCESS]
-  end
-
-  subgraph WF[ Google Cloud Workflows ]
-    WF1[Orquestração<br/>gates por marker + polling]
-  end
-
-  subgraph DP[ Dataproc Serverless for Spark ]
-    BRONZE[[bronze.py<br/>unzip → GCS]]
-    SILVER[[silver.py<br/>schemas/normalizações → Parquet]]
-    GOLD[[gold.py<br/>agregações/flags]]
-    LOAD[[load_postgres.py<br/>UPSERT em Postgres]]
-  end
-
-  subgraph SQL[ Cloud SQL (Postgres) ]
-    TBL[(Tabela final por CNPJ<br/>PK: cnpj)]
-  end
-
-  %% ======== FLOWS ========
-
-  %% Fonte → Ingest
-  S1 -- "HTTP/ZIP" --> A
-  S1 -- "HTTP/ZIP" --> B
-  S1 -- "HTTP/ZIP" --> C
-
-  %% Ingest grava em GCS
-  A -- "escreve" --> RAW
-  A -- "cria" --> MRK
-  B -- "copia para" --> RAW
-  C -- "marca DONE" --> MRK
-
-  %% Workflows decide e cria batches Spark
-  WF1 -- "observa markers +\ncria batches" --> BRONZE
-  BRONZE -- "outputs" --> BRZ --> MRK
-
-  WF1 --> SILVER
-  SILVER -- "inputs: BRZ\noutputs" --> SLV --> MRK
-
-  WF1 --> GOLD
-  GOLD -- "inputs: SLV\noutputs" --> GLD --> MRK
-
-  WF1 --> LOAD
-  LOAD -- "inputs: GLD\nJDBC (Cloud SQL Auth Proxy jar)" --> TBL
-  LOAD -- "on success" --> MRK
-
-  %% ======== STYLES ========
-
-  classDef source fill:#fef3c7,stroke:#f59e0b,color:#111,stroke-width:1px;     %% amarelo (fonte)
-  classDef ingest fill:#fde68a,stroke:#d97706,color:#111,stroke-width:1px;     %% laranja (ingest)
-  classDef storage fill:#dcfce7,stroke:#22c55e,color:#065f46,stroke-width:1px; %% verde (data lake)
-  classDef wf fill:#e9d5ff,stroke:#8b5cf6,color:#4c1d95,stroke-width:1px;      %% roxo (orquestra)
-  classDef spark fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a,stroke-width:1px;   %% azul (spark)
-  classDef db fill:#cffafe,stroke:#06b6d4,color:#0e7490,stroke-width:1px;      %% ciano (db)
-
-  class S1 source
-  class A,B,C ingest
-  class RAW,BRZ,SLV,GLD,MRK storage
-  class WF,WF1 wf
-  class BRONZE,SILVER,GOLD,LOAD spark
-  class TBL db
-
-  %% ======== LEGENDA ========
-  subgraph LEG[Legenda]
-    L1[<b>run_id</b> → controla reprocessamento e partição]
-    L2[Markers *.SUCCESS → idempotência/falhas]
-    L3[Workflows = acoplamento fraco (ingest x Spark)]
-  end
-  class LEG storage
-
-
 ```
 
 ### Decisões
