@@ -71,7 +71,7 @@ flowchart LR
 
   %% === WORKFLOWS ===
   subgraph WF["Google Cloud Workflows"]
-    wf1["Orquestração: <br/>gates por marker <br/> polling de jobs"]
+    wf1["**Orquestração**: <br/>gates por marker <br/> polling de jobs"]
   end
 
   %% === SPARK ===
@@ -84,7 +84,7 @@ flowchart LR
 
   %% === DB ===
   subgraph SQL["Cloud SQL - Postgres "]
-    tbl["Tabela final por CNPJ<br/>PK: cnpj <br/>Pronta p/ apps transacionais!"]
+    tbl["**Tabela final** por CNPJ<br/>PK: cnpj <br/>Pronta p/ apps transacionais!"]
   end
 
   %% === FLOWS ===
