@@ -50,54 +50,63 @@ flowchart LR
 
   %% === SOURCES ===
   subgraph SRC["RFB Dados Abertos"]
-    s1["**ZIPs** publicos:<br/>EmpresasN.zip / SociosN.zip"]
+    s1["ZIPs publicos: EmpresasN.zip / SociosN.zip"]
   end
 
   %% === INGEST ===
-  subgraph ING["Ingestão desacoplada"]
-    A["**Cloud Run** - HTTP, container"]
-    B["**Storage Transfer Service**"]
-    C["**VM** - marker via serial -> GCS"]
+  subgraph ING["Ingestao desacoplada"]
+    A["Cloud Run (HTTP, container)"]
+    B["Storage Transfer Service"]
+    C["VM (serial -> marker em GCS)"]
   end
 
   %% === STORAGE ===
-  subgraph GCS["Cloud Storage e Data Lake"]
-    raw["**raw**/<run_id>/*.zip"]
-    brz["**bronze**/run_id/<br/>empresas,socios/*.csv"]
-    slv["**silver**/run_id/<br/>empresas,socios/*.parquet"]
-    gld["**gold**/run_id/<br/>resultado_final/*.parquet"]
-    mrk["**markers**/run_id/<br/>ingest,bronze,silver,gold, <br/>load;.SUCCESS"]
+  subgraph GCS["Google Cloud Storage (Data Lake)"]
+    raw["raw/<run_id>/*.zip"]
+    brz["bronze/<run_id>/(empresas,socios)/*.csv"]
+    slv["silver/<run_id>/(empresas,socios)/*.parquet"]
+    gld["gold/<run_id>/resultado_final/*.parquet"]
+    mrk["markers/<run_id>/(ingest,bronze,silver,gold,load).SUCCESS"]
   end
 
   %% === WORKFLOWS ===
   subgraph WF["Google Cloud Workflows"]
-    wf1["**Orquestração**: <br/>gates por marker <br/> polling de jobs"]
+    wf1["Orquestracao: gates por marker ou raw"]
   end
 
   %% === SPARK ===
-  subgraph DP["Dataproc Serverless - Spark"]
-    p1["**bronze.py** - <br/>Unzip para GCS"]
-    p2["**silver.py** - <br/>Schemas e<br/>normalizações -> Parquet"]
-    p3["**gold.py** - <br/>Agregações<br/>flags<br/>regras de negócio"]
-    p4["**load_postgres.py**: <br/>UPSERT em Postgres"]
+  subgraph DP["Dataproc Serverless (Spark)"]
+    p1["bronze.py (unzip a partir de raw)"]
+    p2["silver.py (schemas/normalizacoes -> Parquet)"]
+    p3["gold.py (agregacoes/flags)"]
+    p4["load_postgres.py (upsert em Postgres)"]
   end
 
   %% === DB ===
-  subgraph SQL["Cloud SQL - Postgres "]
-    tbl["**Tabela final** por CNPJ<br/>PK: cnpj <br/>Pronta p/ apps transacionais!"]
+  subgraph SQL["Cloud SQL (Postgres)"]
+    tbl["Tabela final por CNPJ (PK: cnpj)"]
   end
 
-  %% === FLOWS ===
-  s1 --> A & B & C
+  %% === FLUXOS DE DADOS ===
+  s1 --> A
+  s1 --> B
+  s1 --> C
 
   A --> raw
   B --> raw
   C --> mrk
 
+  %% join: bronze consome raw; workflows vigia raw/marker
+  raw --> p1
+  wf1 -. polls .-> raw
+  wf1 -. gates .-> mrk
+
+  %% pipeline medallion
   wf1 --> p1 --> brz --> mrk
   wf1 --> p2 --> slv --> mrk
   wf1 --> p3 --> gld --> mrk
   wf1 --> p4 --> tbl --> mrk
+
 ```
 
 ### Decisões
@@ -105,19 +114,19 @@ flowchart LR
 - Eu quis desacoplar ingestão do processamento. 
 O Workflows só “espera um sinal” (marker/arquivos) e toca o Spark. Isso reduz acoplamento, deixa claro onde cada parte falha e me dá flexibilidade: se amanhã alguém quiser puxar o raw com outro método (SFTP, API, crawler…), o pipeline Spark continua igual. Também foi intencional tentar 3 caminhos de ingest (Cloud Run, STS, VM), por robustez — se um modo falhar, tenho outras alternativas já implantadas.
 
-- Postgres (Cloud SQL) na saída: o case pede um banco que permita aplicações transacionais plugarem. Postgres é padrão de mercado, tem chave primária/UPSERT, integra bem com apps e é fácil de versionar/limpar pra homologações.
+- **Postgres** (Cloud SQL) na saída: o case pede um banco que permita aplicações transacionais plugarem. Postgres é padrão de mercado, tem chave primária/UPSERT, integra bem com apps e é fácil de versionar/limpar pra homologações.
 Se o foco fosse 100% analytics, eu apontaria pra BigQuery com certeza. 
 Como eu entendi que "aplicações transacionais plugarem" significaria que necessariamente, estava pedindo por um ambiente transacional para ser possível as aplicações transacionais plugarem, concluí que naturalmente a escolha certa seria um ambiente transacional também, para que fosse possível plugar as aplicações. Em um ambiente analítico, isso não seria possível.
 
-- Spark (Dataproc Serverless): eu gosto bastante de usar Spark e o volume dos dados da RFB pede (COM CERTEZA PEDE) processamento distribuído. Usei Serverless pra não gerenciar cluster.
+- **Spark** (Dataproc Serverless): eu gosto bastante de usar Spark e o volume dos dados da RFB pede (COM CERTEZA PEDE) processamento distribuído. Usei Serverless pra não gerenciar cluster.
 
-- Workflows: simples, barato, sem cluster e state machine clara, e também eu não havia usado esse serviço antes e queria usar uma ferramenta inédita pois ao menos terei aprendido, pelo menos o básico, desse serviço. O que de fato ocorreu, pois passei mais de 60 horas para fazer esse desafio e boa parte desse tempo, em torno de 80 %, foi no workflows. 
+- **Workflows**: simples, barato, sem cluster e state machine clara, e também eu não havia usado esse serviço antes e queria usar uma ferramenta inédita pois ao menos terei aprendido, pelo menos o básico, desse serviço. O que de fato ocorreu, pois passei mais de 60 horas para fazer esse desafio e boa parte desse tempo, em torno de 80 %, foi no workflows. 
 Eu cogitei em usar o Airflow, separando uma dag para ingestao, com diferentes tasks nos 3 modos possíveis, e outras dags para bronze, silver e gold, separadamente. Mas manter um Composer é caro, e acredito que seria justificado se tivessem mais etapas e interdependências.
 Eu construí gates por markers no GCS e polling do estado dos batches Dataproc. Isso me deu idempotência por run_id e reexecução segura.
 
-- Containerização: a camada de ingestão HTTP foi empacotada (Flask + requests) e publicada em Cloud Run (container). O Spark em si já roda “serverless” no Dataproc, não faria sentido colocar em um container.
+- **Containerização**: a camada de ingestão HTTP foi empacotada (Flask + requests) e publicada em Cloud Run (container). O Spark em si já roda “serverless” no Dataproc, não faria sentido colocar em um container.
 
-- Observabilidade/operacional: os markers deixam claro o ponto de falha. O que deu erro? Em que step? O que deu certo? Tudo é parametrizável via run_id e JSON de execução do Workflows. Ficou mais fácil reexecutar só o que falta. O que já deu certo, não é reexecutado.
+- **Observabilidade/operacional**: os markers deixam claro o ponto de falha. O que deu erro? Em que step? O que deu certo? Tudo é parametrizável via run_id e JSON de execução do Workflows. Ficou mais fácil reexecutar só o que falta. O que já deu certo, não é reexecutado.
 
 ### Camadas medalhão
 
@@ -130,14 +139,14 @@ Eu construí gates por markers no GCS e polling do estado dos batches Dataproc. 
 
 ### Ingestão desacoplada (3 modos)
 
-- (A) Cloud Run (HTTP container)
+- (A) **Cloud Run** (HTTP container)
 Recebe bucket, prefixo raw/run_id, urls (RFB) e baixa cada zip direto no GCS. Quando terminar, escreve ingest.SUCCESS.
 HTTP 504 na UI? Proxy pode estourar timeout, mas o job continua; o marker é a verdade, e o Workflows não depende do 200 para progredir — ele observa o marker.
 
-- (B) Storage Transfer Service (STS)
+- (B) **Storage Transfer Service** (STS)
 Defini um job de transferência HTTP→GCS e o Workflows poll a pasta raw/<run_id>/. Achando o arquivo, prossegue.
 
-- (C) VM (marker)
+- (C) **VM** (marker)
 Plano C: se eu precisar rodar scripts legados numa VM, o Workflows liga a VM, espera o marker e segue. Útil pra migrações.
 
 
