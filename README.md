@@ -77,7 +77,7 @@ flowchart LR
   %% === SPARK ===
   subgraph DP["**Dataproc Serverless (Spark)**"]
     p1["**bronze**.py <br/>(unzip a partir de raw)"]
-    p2["**silver**.py <br/>(schemas/normalizacoes -> Parquet)"]
+    p2["**silver**.py <br/>(schemas/normalizacoes -> <br/>Parquet)"]
     p3["**gold**.py <br/>(agregacoes/flags)"]
     p4["**load_postgres**.py <br/>(upsert em Postgres)"]
   end
