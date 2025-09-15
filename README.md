@@ -50,7 +50,7 @@ flowchart LR
 
   %% === SOURCES ===
   subgraph SRC["**RFB Dados Abertos**"]
-    s1["ZIPs publicos: EmpresasN.zip / SociosN.zip"]
+    s1["ZIPs publicos:<br/> EmpresasN.zip / <br/>SociosN.zip"]
   end
 
   %% === INGEST ===
@@ -71,13 +71,13 @@ flowchart LR
 
   %% === WORKFLOWS ===
   subgraph WF["**Google Cloud Workflows**"]
-    wf1["Orquestracao: gates por marker ou raw"]
+    wf1["Orquestracao: <br/>gates por marker ou raw"]
   end
 
   %% === SPARK ===
   subgraph DP["**Dataproc Serverless (Spark)**"]
     p1["**bronze**.py <br/>(unzip a partir de raw)"]
-    p2["**silver**.py <br/>(schemas<br/>normalizacoes -> Parquet)"]
+    p2["**silver**.py <br/>(schemas/normalizacoes -> Parquet)"]
     p3["**gold**.py <br/>(agregacoes/flags)"]
     p4["**load_postgres**.py <br/>(upsert em Postgres)"]
   end
