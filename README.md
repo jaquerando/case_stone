@@ -61,17 +61,17 @@ flowchart LR
   end
 
   %% === STORAGE ===
-  subgraph GCS["Google Cloud Storage<br/>&#40;Data Lake&#41;"]
+  subgraph GCS["Google Cloud Storage;Data Lake;"]
     raw["raw/<run_id>/*.zip"]
-    brz["bronze/<run_id>/<br/>&#40;empresas,socios&#41;/*.csv"]
-    slv["silver/<run_id>/<br/>&#40;empresas,socios&#41;/*.parquet"]
+    brz["bronze/<run_id>/<br/>&#40;empresas,socios/*.csv"]
+    slv["silver/<run_id>/<br/>&#40;empresas,socios/*.parquet"]
     gld["gold/<run_id>/<br/>resultado_final/*.parquet"]
-    mrk["markers/<run_id>/<br/>&#40;ingest,bronze,silver,gold,load&#41;.SUCCESS"]
+    mrk["markers/<run_id>/<br/>&#40;ingest,bronze,silver,gold,load;.SUCCESS"]
   end
 
   %% === WORKFLOWS ===
   subgraph WF["Google Cloud Workflows"]
-    wf1["Orquestração: gates por marker e polling de jobs"]
+    wf1["Orquestração: gates por marker ; polling de jobs;"]
   end
 
   %% === SPARK ===
@@ -83,7 +83,7 @@ flowchart LR
   end
 
   %% === DB ===
-  subgraph SQL["Cloud SQL<br/>&#40;Postgres&#41;"]
+  subgraph SQL["Cloud SQL;Postgres;"]
     tbl["Tabela final por CNPJ<br/>&#40;PK: cnpj&#41;"]
   end
 
