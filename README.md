@@ -63,10 +63,10 @@ flowchart LR
   %% === STORAGE ===
   subgraph GCS["**Google Cloud Storage (Data Lake)**"]
     raw["**raw**/<run_id>/*.zip"]
-    brz["**bronze**/<run_id>/(empresas,socios)/*.csv"]
-    slv["**silver**/<run_id>/(empresas,socios)/*.parquet"]
-    gld["**gold**/<run_id>/resultado_final/*.parquet"]
-    mrk["**markers**/<run_id>/(ingest,bronze,silver,gold,load).SUCCESS"]
+    brz["**bronze**/<run_id>/<br/>(empresas,socios)/*.csv"]
+    slv["**silver**/<run_id>/<br/>(empresas,socios)/*.parquet"]
+    gld["**gold**/<run_id>/<br/>resultado_final/*.parquet"]
+    mrk["**markers**/<run_id>/<br/>(ingest,<br/>bronze,<br/>silver,<br/>gold,<br/>load).SUCCESS"]
   end
 
   %% === WORKFLOWS ===
@@ -77,14 +77,14 @@ flowchart LR
   %% === SPARK ===
   subgraph DP["**Dataproc Serverless (Spark)**"]
     p1["**bronze**.py <br/>(unzip a partir de raw)"]
-    p2["**silver**.py <br/>(schemas/normalizacoes -> Parquet)"]
+    p2["**silver**.py <br/>(schemas<br/>normalizacoes -> Parquet)"]
     p3["**gold**.py <br/>(agregacoes/flags)"]
     p4["**load_postgres**.py <br/>(upsert em Postgres)"]
   end
 
   %% === DB ===
   subgraph SQL["**Cloud SQL (Postgres)**"]
-    tbl["**Tabela final** por CNPJ (PK: cnpj)"]
+    tbl["**Tabela final** por CNPJ <br/>(PK: cnpj)"]
   end
 
   %% === FLUXOS DE DADOS ===
