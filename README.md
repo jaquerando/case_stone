@@ -76,10 +76,10 @@ flowchart LR
 
   %% === SPARK ===
   subgraph DP["Dataproc Serverless - Spark"]
-    p1["bronze.py<br/>Unzip para GCS"]
-    p2["silver.py<br/>Schemas/normalizações -> Parquet"]
-    p3["gold.py<br/>Agregações/flags"]
-    p4["load_postgres.py<br/>UPSERT em Postgres"]
+    p1["bronze.py - Unzip para GCS"]
+    p2["silver.py - Schemas/normalizações -> Parquet"]
+    p3["gold.py - Agregações/flags"]
+    p4["load_postgres.py - UPSERT em Postgres"]
   end
 
   %% === DB ===
