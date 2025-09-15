@@ -13,9 +13,9 @@ O **Workflows** orquestra: escolhe o modo de ingestão, aguarda *markers/arquivo
 
 ```bash
 [RFB Dados Abertos] --(HTTP/ZIP)--> [Ingestão desacoplada]
-                                   ├─ A - Cloud Run (HTTP, container)
-                                   ├─ B - Storage Transfer Service
-                                   └─ C - VM (marker via serial/GCS)
+                                   ├─ (A) Cloud Run (HTTP, container)
+                                   ├─ (B) Storage Transfer Service
+                                   └─ (C) VM (marker via serial/GCS)
 
 [Google Cloud Storage]
    ├─ raw/<run_id>/*.zip
@@ -55,9 +55,9 @@ flowchart LR
 
   %% === INGEST ===
   subgraph ING["Ingestão desacoplada"]
-    A["Cloud Run<br/>&#40;HTTP, container&#41;"]
+    A["Cloud Run - HTTP, container"]
     B["Storage Transfer Service"]
-    C["VM<br/>&#40;marker via serial -> GCS&#41;"]
+    C["VM - marker via serial -> GCS"]
   end
 
   %% === STORAGE ===
@@ -71,14 +71,14 @@ flowchart LR
 
   %% === WORKFLOWS ===
   subgraph WF["Google Cloud Workflows"]
-    wf1["Orquestração:<br/>gates por marker e polling de jobs"]
+    wf1["Orquestração: gates por marker e polling de jobs"]
   end
 
   %% === SPARK ===
-  subgraph DP["Dataproc Serverless<br/>&#40;Spark&#41;"]
-    p1["bronze.py<br/>unzip para GCS"]
-    p2["silver.py<br/>schemas/normalizações -> Parquet"]
-    p3["gold.py<br/>agregações/flags"]
+  subgraph DP["Dataproc Serverless - Spark"]
+    p1["bronze.py<br/>Unzip para GCS"]
+    p2["silver.py<br/>Schemas/normalizações -> Parquet"]
+    p3["gold.py<br/>Agregações/flags"]
     p4["load_postgres.py<br/>UPSERT em Postgres"]
   end
 
