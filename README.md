@@ -9,41 +9,6 @@ O **Workflows** orquestra: escolhe o modo de ingestão, aguarda *markers/arquivo
 
 ## Componentes
 
-- **Bucket GCS** (`case-stone-medallion-<proj>`):
-
-```bash
-[RFB Dados Abertos] --(HTTP/ZIP)--> [Ingestão desacoplada]
-                                   ├─ (A) Cloud Run (HTTP, container)
-                                   ├─ (B) Storage Transfer Service
-                                   └─ (C) VM (marker via serial/GCS)
-
-[Google Cloud Storage]
-   ├─ raw/<run_id>/*.zip
-   ├─ bronze/<run_id>/{empresas,socios}/*.csv
-   ├─ silver/<run_id>/{empresas,socios}/.parquet
-   ├─ gold/<run_id>/resultado_final/.parquet
-   └─ markers/<run_id>/{ingest|bronze|silver|gold|load}.SUCCESS
-
-[Google Cloud Workflows]  → orquestra tudo (gates por marker e polling de jobs)
-     ├─ cria batches no Dataproc Serverless (Spark) p/ bronze/silver/gold/load
-     └─ controla falhas e reentrância (idempotência via markers e run_id)
-
-[Dataproc Serverless for Spark]
-     ├─ bronze.py  → unzip p/ GCS
-     ├─ silver.py  → schemas, normalizações, parquet
-     ├─ gold.py    → regras de negócio (agregações/flags)
-     └─ load_postgres.py → escreve em Cloud SQL (UPSERT por CNPJ)
-
-[Cloud SQL (Postgres)]
-     └─ Tabela final por CNPJ (chave primária), pronta p/ apps transacionais
-```
-
-
-
-
-
-
-
 
 ```mermaid
 flowchart LR
