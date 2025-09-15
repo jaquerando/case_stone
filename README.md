@@ -50,23 +50,23 @@ flowchart LR
 
   %% === SOURCES ===
   subgraph SRC["RFB Dados Abertos"]
-    s1["ZIPs publicos:<br/>EmpresasN.zip / SociosN.zip"]
+    s1["**ZIPs** publicos:<br/>EmpresasN.zip / SociosN.zip"]
   end
 
   %% === INGEST ===
   subgraph ING["Ingestão desacoplada"]
-    A["Cloud Run - HTTP, container"]
-    B["Storage Transfer Service"]
-    C["VM - marker via serial -> GCS"]
+    A["**Cloud Run** - HTTP, container"]
+    B["**Storage Transfer Service**"]
+    C["**VM** - marker via serial -> GCS"]
   end
 
   %% === STORAGE ===
   subgraph GCS["Cloud Storage e Data Lake"]
-    raw["raw/<run_id>/*.zip"]
-    brz["bronze/run_id/<br/>empresas,socios/*.csv"]
-    slv["silver/run_id/<br/>empresas,socios/*.parquet"]
-    gld["gold/run_id/<br/>resultado_final/*.parquet"]
-    mrk["markers/run_id/<br/>ingest,bronze,silver,gold, <br/>load;.SUCCESS"]
+    raw["**raw**/<run_id>/*.zip"]
+    brz["**bronze**/run_id/<br/>empresas,socios/*.csv"]
+    slv["**silver**/run_id/<br/>empresas,socios/*.parquet"]
+    gld["**gold**/run_id/<br/>resultado_final/*.parquet"]
+    mrk["**markers**/run_id/<br/>ingest,bronze,silver,gold, <br/>load;.SUCCESS"]
   end
 
   %% === WORKFLOWS ===
@@ -77,9 +77,9 @@ flowchart LR
   %% === SPARK ===
   subgraph DP["Dataproc Serverless - Spark"]
     p1["**bronze.py** - <br/>Unzip para GCS"]
-    p2["silver.py - <br/>Schemas e<br/>normalizações -> Parquet"]
-    p3["gold.py - <br/>Agregações<br/>flags<br/>regras de negócio"]
-    p4["load_postgres.py: <br/>UPSERT em Postgres"]
+    p2["**silver.py** - <br/>Schemas e<br/>normalizações -> Parquet"]
+    p3["**gold.py** - <br/>Agregações<br/>flags<br/>regras de negócio"]
+    p4["**load_postgres.py**: <br/>UPSERT em Postgres"]
   end
 
   %% === DB ===
