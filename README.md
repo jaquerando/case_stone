@@ -49,7 +49,7 @@ O **Workflows** orquestra: escolhe o modo de ingestão, aguarda *markers/arquivo
 flowchart LR
 
   %% === SOURCES ===
-  subgraph SRC["RFB Dados Abertos"]
+  subgraph SRC["**RFB Dados Abertos**"]
     s1["ZIPs publicos: EmpresasN.zip / SociosN.zip"]
   end
 
