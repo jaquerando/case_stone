@@ -13,9 +13,9 @@ O **Workflows** orquestra: escolhe o modo de ingestão, aguarda *markers/arquivo
 
 ```bash
 [RFB Dados Abertos] --(HTTP/ZIP)--> [Ingestão desacoplada]
-                                   ├─(A) Cloud Run (HTTP, container)
-                                   ├─(B) Storage Transfer Service
-                                   └─(C) VM (marker via serial/GCS)
+                                   ├─ A - Cloud Run (HTTP, container)
+                                   ├─ B - Storage Transfer Service
+                                   └─ C - VM (marker via serial/GCS)
 
 [Google Cloud Storage]
    ├─ raw/<run_id>/*.zip
