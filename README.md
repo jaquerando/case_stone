@@ -78,13 +78,13 @@ flowchart LR
   subgraph DP["Dataproc Serverless - Spark"]
     p1["bronze.py - Unzip para GCS"]
     p2["silver.py - Schemas e<br/>normalizações -> Parquet"]
-    p3["gold.py - Agregações/flags"]
+    p3["gold.py - Agregações<br/>flags<br/>regras de negócio"]
     p4["load_postgres.py: <br/>UPSERT em Postgres"]
   end
 
   %% === DB ===
   subgraph SQL["Cloud SQL - Postgres "]
-    tbl["Tabela final por CNPJ<br/>PK: cnpj"]
+    tbl["Tabela final por CNPJ<br/>PK: cnpj <br/>Pronta p/ apps transacionais!"]
   end
 
   %% === FLOWS ===
