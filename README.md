@@ -71,7 +71,7 @@ flowchart LR
 
   %% === WORKFLOWS ===
   subgraph WF["Google Cloud Workflows"]
-    wf1["Orquestração: gates por marker ; polling de jobs;"]
+    wf1["Orquestração: <br/>gates por marker <br/> polling de jobs"]
   end
 
   %% === SPARK ===
@@ -79,7 +79,7 @@ flowchart LR
     p1["bronze.py - Unzip para GCS"]
     p2["silver.py - Schemas/normalizações -> Parquet"]
     p3["gold.py - Agregações/flags"]
-    p4["load_postgres.py - UPSERT em Postgres"]
+    p4["load_postgres.py: <br/>UPSERT em Postgres"]
   end
 
   %% === DB ===
