@@ -196,7 +196,7 @@ Foi empacotado uma API HTTP simples (Flask) que baixa os ZIPs da RFB para o GCS 
 
 No Cloud Run o custo é por vCPU-segundo, GiB-segundo de RAM e requisições, apenas enquanto o request está sendo processado.
 
-Build & deploy do container no Cloud Run
+**Build & deploy do container no Cloud Run**
 
 ```bash
 # vars
@@ -226,7 +226,7 @@ CF_URL=$(gcloud run services describe "$SERVICE" \
 echo "$CF_URL"
 ```
 
-Testar rápido a ingestão (manual)
+**Testar rápido a ingestão (manual)**
 
  ```bash
 RUN_ID="smoke-$(date +%H%M%S)"
@@ -248,7 +248,7 @@ curl -i -X POST "$CF_URL" \
   -d "$payload"
 
 ```
-
+**Atualizar o exec.json (se quiser rodar tudo via Workflow)**
 ```bash
 cat > ~/infra/exec.json <<EOF
 {
@@ -286,9 +286,19 @@ gcloud workflows execute medallion-spark \
   --location="$REGION" \
   --data="$(< ~/infra/exec.json)"
 ```
-
+**Acompanhar execução**
 ```bash
+EXEC_ID="$(gcloud workflows executions list medallion-spark \
+  --location="$REGION" --limit=1 --format='value(name)')"
 
+gcloud workflows executions describe "$EXEC_ID" \
+  --location="$REGION" \
+  --format='value(state,result,error)'
+
+# logs (útil se algo quebrar durante download)
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="ingest-rfb"' \
+  --limit=50 --format='value(textPayload)'
 ```
 
 ```bash
