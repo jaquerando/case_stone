@@ -49,7 +49,7 @@ flowchart LR
 
   %% === DB ===
   subgraph SQL["**Cloud SQL (Postgres)**"]
-    tbl["**Tabela final** por CNPJ <br/>(PK: cnpj) <br/>Pronta p/ apps transacionais"]
+    tbl["**Tabela final** por CNPJ <br/>(PK: cnpj) <br/>Pronta para <br/>apps transacionais"]
   end
 
   %% === FLUXOS DE DADOS ===
