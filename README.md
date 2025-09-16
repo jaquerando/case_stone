@@ -369,3 +369,121 @@ Quando aparece arquivo, eu sigo pro Bronze (Spark no Dataproc).
  - Manifesto versionado: coloco o urls.txt dentro de infra/ no repo, e copio pro GCS num prefixo com run_id antes de criar/rodar o job. Fica auditável.
 
  - Backoff no polling: no Workflow, o loop de listing tem sleep e timeout implícito (pela duração total do workflow). Se estourar tempo, falha com erro claro de ingestão.
+
+### (C) VM
+
+É um caminho alternativo de ingestão quando eu não quero depender de HTTP síncrono (Cloud Run) nem do Storage Transfer Service. A VM roda um startup script que:
+
+ - baixa os ZIPs públicos da RFB (EmpresasN.zip / SociosN.zip),
+
+ - coloca em gs://<bucket>/raw/<run_id>/,
+
+ - grava o marker gs://<bucket>/markers/<run_id>/ingest.SUCCESS,
+
+Após isso, desliga.
+
+O Workflow inicia a VM e fica *polling* pelo marker — quando aparece, segue para bronze.  
+Esse caminho evita timeouts HTTP do Cloud Run e me da controle total de ferramentas (curl/aria2c/gsutil).
+
+**Timeouts**: Cloud Run tem timeout de request — downloads longos de múltiplos GB são chatos por HTTP síncrono.
+
+**Ferramentas “de máquina”**: na VM eu uso curl/aria2c/gsutil -m à vontade, com retry e paralelismo.
+
+**Desacoplamento**: o Workflow só espera o marker. Se a VM fizer o trabalho (hoje ou daqui a 1h), o pipeline segue a partir do Bronze.
+
+**Permissões**
+
+SA da VM: vm-ingest-sa@<project>.iam.gserviceaccount.com
+
+Papéis essenciais:
+
+Storage Object Admin (escrever em gs://bucket)
+
+Logs Writer (mandar logs pro Cloud Logging)
+
+
+No YAML, a rota ingest_mode == "vm" faz:
+
+ - compute.instances.start para ligar a instância, com um loop que fica procurando o objeto markers/<run_id>/ingest.SUCCESS no GCS. Quando acha, segue para o bronze.
+
+**Startup script (idempotente + marker)**
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+H='Metadata-Flavor: Google'
+getmd () { curl -sf "http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1" -H "$H"; }
+
+BUCKET="$(getmd bucket)"
+RUN_ID="$(getmd run_id)"
+URLS="$(getmd urls)"            # CSV simples: https://.../Empresas0.zip,https://.../Socios0.zip
+PARALLEL="${PARALLEL:-4}"
+
+RAW_DIR="/tmp/raw/${RUN_ID}"
+mkdir -p "${RAW_DIR}"
+
+log(){ echo "[$(date -Iseconds)] $*"; }
+
+download_one () {
+  local url="$1"
+  local fname; fname="$(basename "$url")"
+  log "Baixando $url -> ${RAW_DIR}/${fname}"
+  # Retry agressivo pra link público
+  curl -L --retry 10 --retry-delay 5 --retry-connrefused --fail \
+       --max-time 0 \
+       -o "${RAW_DIR}/${fname}" "$url"
+}
+
+log "Ingest VM start — bucket=${BUCKET} run_id=${RUN_ID} urls=${URLS}"
+
+# split por vírgula e baixa
+IFS=',' read -ra arr <<< "$URLS"
+for u in "${arr[@]}"; do
+  download_one "$(echo "$u" | xargs)"
+done
+
+log "Upload GCS: gs://${BUCKET}/raw/${RUN_ID}/"
+gsutil -m cp -n "${RAW_DIR}/"* "gs://${BUCKET}/raw/${RUN_ID}/"
+
+log "Gravando marker de sucesso"
+echo ok | gsutil -h "Content-Type:text/plain" cp - "gs://${BUCKET}/markers/${RUN_ID}/ingest.SUCCESS"
+
+log "Ingest finalizada, desligando VM"
+shutdown -h now || true
+```
+
+Esse script envio para gs://bucket/infra/ingest_startup.sh e referenciar via startup-script-url.
+
+```bash
+# variáveis
+PROJECT_ID="case-stone-471402"
+ZONE="us-central1-a"
+VM_NAME="vm-ingest"
+BUCKET="case-stone-medallion-471402"
+RUN_ID="doc-sample-$(date +%Y%m%d-%H%M%S)"
+URLS="https://dadosabertos.rfb.gov.br/CNPJ/Empresas0.zip,https://dadosabertos.rfb.gov.br/CNPJ/Socios0.zip"
+SA_EMAIL="vm-ingest-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# (opcional) criar SA e papéis
+#gcloud iam service-accounts create vm-ingest-sa --project "$PROJECT_ID"
+#gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+#  --member="serviceAccount:${SA_EMAIL}" \
+#  --role="roles/storage.objectAdmin"
+#gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+#  --member="serviceAccount:${SA_EMAIL}" \
+#  --role="roles/logging.logWriter"
+
+# criar VM com startup-script inline e metadados
+gcloud compute instances create "$VM_NAME" \
+  --project "$PROJECT_ID" \
+  --zone "$ZONE" \
+  --machine-type "e2-small" \
+  --service-account "$SA_EMAIL" \
+  --scopes "https://www.googleapis.com/auth/cloud-platform" \
+  --metadata="bucket=${BUCKET},run_id=${RUN_ID},urls=${URLS}" \
+  --metadata-from-file startup-script=ingest_startup.sh \
+  --no-address   # sem IP público (opcional se tiver NAT)
+
+```
+
