@@ -312,3 +312,60 @@ gcloud logging read \
 ```bash
 
 ```
+
+
+**
+
+###(B) **Storage Transfer Service** (STS)
+
+O STS é o serviço gerenciado do Google pra puxar/empurrar dados entre fontes e o Cloud Storage, com paralelismo, reintentos, verificação de integridade e agendamento. Pra este case, usei o modo “Transfer from the Internet” (HTTP/HTTPS), já que os ZIPs da RFB ficam publicados em URLs públicas.
+
+**Custos**
+
+ - Cloud Storage ingress (upload): R$ 0.
+ - Operações: cada objeto gravado conta como Classe A (baratinho, mas existe). Como são poucos arquivos (ZIPs grandes), o custo é irrelevante.
+ - STS em si: o uso do serviço não tem taxa separada; você paga os recursos de Storage/Network conforme a tabela do Cloud Storage.
+
+**Manifesto de URLs**
+
+Eu monto uma lista de URLs (um arquivo .txt no próprio GCS, uma por linha
+
+```bash
+https://dadosabertos.rfb.gov.br/CNPJ/Empresas0.zip
+https://dadosabertos.rfb.gov.br/CNPJ/Socios0.zip
+```
+
+**Job do STS**
+
+Crio um Transfer Job “from the Internet” apontando esse manifesto como fonte e o prefixo de destino no bucket como raw/<run_id>/.
+
+**Permissões**
+
+O STS usa a service account gerenciada do projeto no padrão:
+
+```bash
+<PROJECT-NUMBER>-compute@developer.gserviceaccount.com
+```
+Eu dei Storage Object Admin no bucket de destino, pra ele poder gravar os ZIPs.
+
+**Execução via Workflow**
+
+No meu workflow_medallion.yaml, quando eu seleciono ingest_mode: "sts", eu:
+
+ - começo o job com transferJobs.run (o job já está criado, só mando rodar),
+
+ - fico executando poll no GCS: gs://<bucket>/raw/<run_id>/ até aparecerem objetos,
+
+Quando aparece arquivo, eu sigo pro Bronze (Spark no Dataproc).
+
+ - O STS só baixa; o marcador de sucesso da ingestão eu não gravo por STS (não há necessidade). Eu “considero ingerido” quando vejo pelo menos um objeto em raw/<run_id>/.
+
+ - O resto do fluxo (bronze/silver/gold/load) continua com markers markers/<run_id>/*.SUCCESS como antes.
+
+ - Um run_id por execução: evita confundir escrita de um run no outro. Também deixa claro no bucket o que pertence a cada execução.
+
+ - Prefixos fixos por camada (raw/run_id, bronze/run_id, …) e markers (markers/run_id/*.SUCCESS) pra retomar de onde parou.
+
+ - Manifesto versionado: coloco o urls.txt dentro de infra/ no repo, e copio pro GCS num prefixo com run_id antes de criar/rodar o job. Fica auditável.
+
+ - Backoff no polling: no Workflow, o loop de listing tem sleep e timeout implícito (pela duração total do workflow). Se estourar tempo, falha com erro claro de ingestão.
