@@ -316,7 +316,7 @@ gcloud logging read \
 
 **
 
-###(B) **Storage Transfer Service** (STS)
+### (B) **Storage Transfer Service** (STS)
 
 O STS é o serviço gerenciado do Google pra puxar/empurrar dados entre fontes e o Cloud Storage, com paralelismo, reintentos, verificação de integridade e agendamento. Pra este case, usei o modo “Transfer from the Internet” (HTTP/HTTPS), já que os ZIPs da RFB ficam publicados em URLs públicas.
 
