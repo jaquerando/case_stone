@@ -74,6 +74,21 @@ flowchart LR
 
 ```
 
+## Pipelines Spark
+
+**bronze**.py
+Lê raw_zips/*.zip do GCS, unzip para bronze/<run_id>/{empresas,socios}/… e escreve markers/<run_id>/bronze.SUCCESS.
+
+**silver**.py
+Lê CSV bruto, aplica schemas e casts, corrige capital_social, escreve parquet em silver/<run_id>/{empresas,socios} e marca silver.SUCCESS.
+
+**gold**.py
+Junta silver/empresas + silver/socios, calcula agregações e flags, salva em gold/<run_id>/resultado_final e marca gold.SUCCESS.
+
+**load_postgres**.py
+Lê o gold, conecta em Cloud SQL Postgres (via JDBC + Cloud SQL connector), faz UPSERT por CNPJ (idempotente) e marca load.SUCCESS.
+
+
 ### Decisões
 
 - Eu quis desacoplar **ingestão** do processamento. 
@@ -164,3 +179,126 @@ Visão da UI:
 - Se algum dia essa ingestão precisar de SLA forte, eu colocaria Pub/Sub + Cloud Run jobs com retry/backoff.
 
 
+### (A) **Cloud Run** (HTTP container)
+
+Foi empacotado uma API HTTP simples (Flask) que baixa os ZIPs da RFB para o GCS e grava um marker. Isso é executado em Cloud Run (container gerenciado). Ele escala a zero quando está ocioso e sobe sob demanda quando o Workflow chama a URL. 
+É totalmente stateless: tudo que precisa vem no JSON da requisição (bucket/prefix/run_id/urls/marker).
+
+- Cloud Run recebe {bucket, prefix, run_id, urls[], marker} e faz só a coleta (download → raw/<run_id>/ + markers/<run_id>/ingest.SUCCESS).
+
+- Workflow faz o encadeamento bronze → silver → gold → load (Dataproc Serverless) e só avança quando encontra os markers (idempotência).
+
+- Dataproc Serverless (Spark) roda os .py (bronze/silver/gold/load).
+
+- Cloud SQL (Postgres) recebe a tabela final (UPSERT por CNPJ)
+
+ **Custo**
+
+No Cloud Run o custo é por vCPU-segundo, GiB-segundo de RAM e requisições, apenas enquanto o request está sendo processado.
+
+Build & deploy do container no Cloud Run
+
+```bash
+# vars
+export PROJECT_ID=case-stone-471402
+export REGION=us-central1
+export REPO=medallion-artifacts
+export SERVICE=ingest-rfb
+
+# (uma vez) repositório de imagens
+gcloud artifacts repositories create "$REPO" \
+  --repository-format=docker --location="$REGION" 2>/dev/null || true
+
+# build & push (pasta ~/cf com Dockerfile, requirements.txt, main.py)
+gcloud builds submit ~/cf \
+  --tag "$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE:v1"
+
+# deploy (HTTP público; ajuste recursos/timeout conforme necessário)
+gcloud run deploy "$SERVICE" \
+  --image "$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE:v1" \
+  --region "$REGION" \
+  --allow-unauthenticated \
+  --cpu=1 --memory=512Mi --concurrency=1 --timeout=900
+
+# pegar a URL
+CF_URL=$(gcloud run services describe "$SERVICE" \
+  --region="$REGION" --format='value(status.url)')
+echo "$CF_URL"
+```
+
+Testar rápido a ingestão (manual)
+
+ ```bash
+RUN_ID="smoke-$(date +%H%M%S)"
+BUCKET=case-stone-medallion-471402
+EMP_URL="https://dadosabertos.rfb.gov.br/CNPJ/Empresas0.zip"
+SOC_URL="https://dadosabertos.rfb.gov.br/CNPJ/Socios0.zip"
+
+payload=$(jq -c -n \
+  --arg bucket "$BUCKET" \
+  --arg prefix "raw/$RUN_ID/" \
+  --arg run_id "$RUN_ID" \
+  --arg emp "$EMP_URL" \
+  --arg soc "$SOC_URL" \
+  --arg marker "markers/$RUN_ID/ingest.SUCCESS" \
+  '{bucket:$bucket, prefix:$prefix, run_id:$run_id, urls:[$emp,$soc], marker:$marker}')
+
+curl -i -X POST "$CF_URL" \
+  -H "Content-Type: application/json" \
+  -d "$payload"
+
+```
+
+```bash
+cat > ~/infra/exec.json <<EOF
+{
+  "cfg": {
+    "project_id": "$PROJECT_ID",
+    "region": "$REGION",
+    "bucket": "$BUCKET",
+    "run_id": "exec-$(date +%Y%m%d-%H%M%S)",
+
+    "ingest_mode": "function",
+    "function_url": "$CF_URL",
+    "ingest_urls": [
+      "https://dadosabertos.rfb.gov.br/CNPJ/Empresas0.zip",
+      "https://dadosabertos.rfb.gov.br/CNPJ/Socios0.zip"
+    ],
+
+    "bronze_py": "gs://$BUCKET/code/bronze.py",
+    "silver_py": "gs://$BUCKET/code/silver.py",
+    "gold_py":   "gs://$BUCKET/code/gold.py",
+    "load_py":   "gs://$BUCKET/code/load_postgres.py",
+
+    "jar_cloudsql": "gs://$BUCKET/jars/cloud-sql-postgres-1.17.0.jar",
+    "jar_postgres": "gs://$BUCKET/jars/postgresql-42.7.4.jar",
+
+    "instance_conn_name": "case-stone-471402:us-central1:stone-pg",
+    "db_name": "stone",
+    "db_user": "stone",
+    "db_pass": "stone123!"
+  }
+}
+EOF
+
+gcloud workflows execute medallion-spark \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --data="$(< ~/infra/exec.json)"
+```
+
+```bash
+
+```
+
+```bash
+
+```
+
+```bash
+
+```
+
+```bash
+
+```
