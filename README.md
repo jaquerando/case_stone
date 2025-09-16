@@ -36,7 +36,7 @@ flowchart LR
 
   %% === WORKFLOWS ===
   subgraph WF["**Google Cloud Workflows**"]
-    wf1["**Orquestracao**: <br/>gates por marker ou raw"]
+    wf1["**Orquestração**: <br/>gates por marker ou raw"]
   end
 
   %% === SPARK ===
@@ -300,19 +300,6 @@ gcloud logging read \
   'resource.type="cloud_run_revision" AND resource.labels.service_name="ingest-rfb"' \
   --limit=50 --format='value(textPayload)'
 ```
-
-```bash
-
-```
-
-```bash
-
-```
-
-```bash
-
-```
-
 
 **
 
